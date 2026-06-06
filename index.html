@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>課堂文字雲互動</title>
 <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -188,9 +187,9 @@ function startTeacher() {
   document.getElementById('joinUrl').textContent = studentUrl;
   document.getElementById('roomCode').textContent = curRoom;
 
-  // 產生 QR code
-  document.getElementById('qrcode').innerHTML = '';
-  new QRCode(document.getElementById('qrcode'), { text: studentUrl, width: 120, height: 120 });
+  // 產生 QR code（用 QR 圖片服務，最穩定）
+  const qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=130x130&margin=0&data=' + encodeURIComponent(studentUrl);
+  document.getElementById('qrcode').innerHTML = '<img width="130" height="130" alt="QR code" src="' + qrImg + '">';
 
   // 開始輪詢
   refreshCloud();
