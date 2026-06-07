@@ -112,6 +112,7 @@
   </div>
   <div class="controls">
     <button class="btn-ghost" onclick="location.href=location.pathname">＋ 新題目</button>
+    <button class="btn-ghost" onclick="downloadWords()">⬇ 下載文字</button>
     <button class="btn-clear" onclick="clearRoom()">🗑 清除所有回覆</button>
   </div>
 </div>
@@ -181,6 +182,8 @@ function toast(msg) {
 // ============================================================
 let curRoom = '', curQuestion = '';
 let unsubscribe = null;
+let latestRows = [];   // 目前房間所有回覆（含重複），供下載用
+let latestFreq = [];   // 詞頻 [[詞, 次數], ...]
 
 window.startTeacher = function() {
   curQuestion = document.getElementById('setupQuestion').value.trim() || '請輸入關鍵字';
@@ -201,6 +204,7 @@ window.startTeacher = function() {
   const q = query(collection(db, COLLECTION), where('room', '==', curRoom));
   unsubscribe = onSnapshot(q, (snapshot) => {
     const rows = snapshot.docs.map(d => d.data());
+    latestRows = rows;
     document.getElementById('stats').textContent = rows.length + ' 則回覆';
 
     const freq = {};
@@ -209,6 +213,7 @@ window.startTeacher = function() {
       if (w) freq[w] = (freq[w] || 0) + 1;
     });
     const list = Object.entries(freq);
+    latestFreq = list.slice().sort((a, b) => b[1] - a[1]);
 
     const hint = document.getElementById('emptyHint');
     if (list.length === 0) {
@@ -249,6 +254,32 @@ function drawCloud(list) {
     shuffle: false,
     drawOutOfBound: false,
   });
+}
+
+window.downloadWords = function() {
+  if (!latestFreq.length) { toast('目前還沒有回覆'); return; }
+
+  // CSV：詞頻統計（依次數由高到低）
+  let csv = '﻿';  // UTF-8 BOM，讓 Excel 正確顯示中文
+  csv += '關鍵字,出現次數\n';
+  latestFreq.forEach(([word, count]) => {
+    csv += '"' + word.replace(/"/g, '""') + '",' + count + '\n';
+  });
+  csv += '\n所有回覆（含重複）\n';
+  latestRows.forEach(r => {
+    csv += '"' + (r.word || '').replace(/"/g, '""') + '"\n';
+  });
+
+  const stamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '文字雲_' + curRoom + '_' + stamp + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  toast('已下載 ✓');
 }
 
 window.clearRoom = async function() {
