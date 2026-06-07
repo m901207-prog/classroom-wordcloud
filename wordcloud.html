@@ -211,10 +211,21 @@ window.startTeacher = function() {
     const list = Object.entries(freq);
 
     const hint = document.getElementById('emptyHint');
-    if (list.length === 0) { hint.classList.remove('hidden'); return; }
+    if (list.length === 0) {
+      hint.classList.remove('hidden');
+      clearCanvas();
+      return;
+    }
     hint.classList.add('hidden');
     drawCloud(list);
   });
+}
+
+function clearCanvas() {
+  const canvas = document.getElementById('cloud');
+  if (typeof WordCloud !== 'undefined' && WordCloud.stop) WordCloud.stop();
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
 function drawCloud(list) {
