@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>課堂文字雲互動</title>
-<script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -34,7 +33,16 @@
   #qrcode img { display: block; }
 
   #cloudWrap { position: relative; height: 62vh; margin-top: 16px; }
-  #cloud { width: 100%; height: 100%; }
+  #cloud {
+    width: 100%; height: 100%; overflow: hidden; padding: 24px;
+    display: flex; flex-wrap: wrap; align-items: center;
+    align-content: center; justify-content: center; gap: 4px 24px;
+  }
+  #cloud .w {
+    line-height: 1.0; font-weight: 800; white-space: nowrap;
+    display: inline-block; animation: pop .35s ease;
+  }
+  @keyframes pop { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   .stats { position: absolute; top: 12px; right: 16px; font-size: 14px; opacity: 0.55; }
   .empty-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; opacity: 0.4; }
 
@@ -108,7 +116,7 @@
   <div id="cloudWrap" class="card">
     <div class="stats" id="stats">0 則回覆</div>
     <div class="empty-hint" id="emptyHint">等待學員提交中…</div>
-    <canvas id="cloud"></canvas>
+    <div id="cloud"></div>
   </div>
   <div class="controls">
     <button class="btn-ghost" onclick="location.href=location.pathname">＋ 新題目</button>
@@ -209,7 +217,7 @@ window.startTeacher = function() {
 
     const freq = {};
     rows.forEach(r => {
-      const w = (r.word || '').trim();
+      const w = (r.word || '').normalize('NFC').trim();
       if (w) freq[w] = (freq[w] || 0) + 1;
     });
     const list = Object.entries(freq);
@@ -227,33 +235,34 @@ window.startTeacher = function() {
 }
 
 function clearCanvas() {
-  const canvas = document.getElementById('cloud');
-  if (typeof WordCloud !== 'undefined' && WordCloud.stop) WordCloud.stop();
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  document.getElementById('cloud').innerHTML = '';
 }
 
+// 用網頁文字排版畫文字雲：任何裝置（蘋果、安卓）打的字、emoji 都保證顯示
 function drawCloud(list) {
-  const canvas = document.getElementById('cloud');
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
-  const maxCount = Math.max(...list.map(x => x[1]));
+  const cloud = document.getElementById('cloud');
+  const counts = list.map(x => x[1]);
+  const maxCount = Math.max(...counts);
+  const minCount = Math.min(...counts);
   const colors = ['#ffd166','#06d6a0','#118ab2','#ef476f','#f78c6b','#83c5be','#fca311','#90e0ef'];
 
-  WordCloud(canvas, {
-    list: list,
-    gridSize: Math.round(16 * canvas.width / 1024),
-    weightFactor: function (size) {
-      return Math.max(18, (size / maxCount) * (canvas.height / 4) + 14);
-    },
-    fontFamily: 'Microsoft JhengHei, PingFang TC, sans-serif',
-    color: function () { return colors[Math.floor(Math.random()*colors.length)]; },
-    backgroundColor: 'transparent',
-    rotateRatio: 0.3,
-    rotationSteps: 2,
-    shuffle: false,
-    drawOutOfBound: false,
-  });
+  // 依次數由多到少排列，字數越多的排前面（越大）
+  const sorted = list.slice().sort((a, b) => b[1] - a[1]);
+  // 依詞數自動縮小字級，避免太多字時擠爆畫面
+  const n = sorted.length;
+  const bigMax = n > 40 ? 60 : n > 20 ? 78 : 96;   // 最大字級
+  const bigMin = 22;                                // 最小字級
+
+  cloud.innerHTML = sorted.map((item, i) => {
+    const word = item[0], count = item[1];
+    const t = (maxCount === minCount) ? 1 : (count - minCount) / (maxCount - minCount);
+    const size = Math.round(bigMin + t * (bigMax - bigMin));
+    const color = colors[i % colors.length];
+    const op = (0.7 + t * 0.3).toFixed(2);
+    return '<span class="w" style="font-size:' + size + 'px;color:' + color +
+           ';opacity:' + op + '" title="' + escapeHtml(word) + ' ×' + count + '">' +
+           escapeHtml(word) + '</span>';
+  }).join('');
 }
 
 window.downloadWords = function() {
@@ -308,7 +317,7 @@ function initStudent() {
 const myWords = [];
 window.submitWord = async function() {
   const input = document.getElementById('wordInput');
-  const word = input.value.trim();
+  const word = input.value.normalize('NFC').trim();
   if (!word) return;
   const btn = document.getElementById('sendBtn');
   btn.disabled = true;
